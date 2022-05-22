@@ -1,7 +1,6 @@
 package com.hyperskill.webquizengine.controller;
 
 import com.hyperskill.webquizengine.model.Quiz;
-import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -61,4 +60,40 @@ public class QuizController {
 
     }
 
+    @GetMapping("/api/quizzes/{id}")
+    public ResponseEntity<Quiz> getQuizById(@PathVariable("id") int id){
+        for(Quiz quiz: allQuizzes){
+            if(quiz.getId() == id){
+                return ResponseEntity.ok(quiz);
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Quiz not found.");
+    }
+
+    @GetMapping("/api/quizzes")
+    public ResponseEntity<List<Quiz>> getQuizzes(){
+        return ResponseEntity.ok(allQuizzes);
+    }
+
+    @PostMapping("/api/quizzes/{id}/solve")
+    public ResponseEntity<Map<String,Object>> solveQuiz(@PathVariable("id") int id, @RequestParam int answer){
+        for(Quiz quiz: allQuizzes){
+            if(quiz.getId() == id){
+
+                if(quiz.getAnswer() == answer){
+                    return ResponseEntity.ok(
+                            Map.of("success",true, "feedback","Congratulations, you're right!")
+                    );
+                }
+
+                else{
+                    return ResponseEntity.ok(
+                            Map.of("success",false, "feedback","Wrong answer! Please, try again.")
+                    );
+                }
+            }
+        }
+
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Quiz not found.");
+    }
 }
