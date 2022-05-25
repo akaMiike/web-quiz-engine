@@ -73,11 +73,12 @@ public class QuizController {
     }
 
     @PostMapping("/api/quizzes/{id}/solve")
-    public ResponseEntity<Map<String,Object>> solveQuiz(@PathVariable("id") int id, @RequestParam int answer){
+    public ResponseEntity<Map<String,Object>> solveQuiz(@PathVariable("id") int id, @RequestBody Map<String,List<Integer>> map){
+        List<Integer> answers = map.get("answer");
         for(Quiz quiz: allQuizzes){
             if(quiz.getId() == id){
 
-                if(quiz.getAnswer().contains(answer)){
+                if(quiz.getAnswer().equals(answers)){
                     return ResponseEntity.ok(
                             Map.of("success",true, "feedback","Congratulations, you're right!")
                     );
