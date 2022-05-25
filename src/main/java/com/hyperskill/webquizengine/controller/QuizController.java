@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.validation.Valid;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,20 +44,16 @@ public class QuizController {
     }
 
     @PostMapping("/api/quizzes")
-    public ResponseEntity<Quiz> createQuiz(@RequestBody Map<String,Object> quiz){
-        String title = quiz.containsKey("title") ? (String) quiz.get("title") : "";
-        String text = quiz.containsKey("text") ? (String) quiz.get("text") : "";
-        List<String> options = quiz.containsKey("options") ? (List<String>) quiz.get("options") : new ArrayList<>();
-        int answer = quiz.containsKey("answer") ? (int) quiz.get("answer") : -1;
+    public ResponseEntity<Quiz> createQuiz(@RequestBody @Valid Quiz quiz){
+        for(Integer answer : quiz.getAnswer()){
+            if(answer >= quiz.getOptions().size() || answer < 0){
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"index of answer is not in the options.");
+            }
+        }
 
-        if(options.size() == 0 || answer < 0 || answer >= options.size()){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"index of answer is not in the options.");
-        }
-        else{
-            Quiz newQuiz = new Quiz(++id, title, text, options, answer);
-            allQuizzes.add(newQuiz);
-            return ResponseEntity.ok(newQuiz);
-        }
+        Quiz newQuiz = new Quiz(++id, quiz.getTitle(), quiz.getText(), quiz.getOptions(), quiz.getAnswer());
+        allQuizzes.add(newQuiz);
+        return ResponseEntity.ok(newQuiz);
 
     }
 
@@ -80,7 +77,7 @@ public class QuizController {
         for(Quiz quiz: allQuizzes){
             if(quiz.getId() == id){
 
-                if(quiz.getAnswer() == answer){
+                if(quiz.getAnswer().contains(answer)){
                     return ResponseEntity.ok(
                             Map.of("success",true, "feedback","Congratulations, you're right!")
                     );
@@ -96,4 +93,6 @@ public class QuizController {
 
         throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Quiz not found.");
     }
+
+
 }
