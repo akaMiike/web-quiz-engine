@@ -1,5 +1,7 @@
 package com.hyperskill.webquizengine.controller;
 
+import com.hyperskill.webquizengine.dto.QuizCreationDTO;
+import com.hyperskill.webquizengine.dto.QuizReturnDTO;
 import com.hyperskill.webquizengine.model.Quiz;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,7 +46,7 @@ public class QuizController {
     }
 
     @PostMapping("/api/quizzes")
-    public ResponseEntity<Quiz> createQuiz(@RequestBody @Valid Quiz quiz){
+    public ResponseEntity<QuizReturnDTO> createQuiz(@RequestBody @Valid QuizCreationDTO quiz){
         for(Integer answer : quiz.getAnswer()){
             if(answer >= quiz.getOptions().size() || answer < 0){
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"index of answer is not in the options.");
@@ -53,28 +55,37 @@ public class QuizController {
 
         Quiz newQuiz = new Quiz(++id, quiz.getTitle(), quiz.getText(), quiz.getOptions(), quiz.getAnswer());
         allQuizzes.add(newQuiz);
-        return ResponseEntity.ok(newQuiz);
+
+        QuizReturnDTO newQuizDTO = new QuizReturnDTO(newQuiz.getId(), newQuiz.getTitle(), newQuiz.getText(), newQuiz.getOptions());
+        return ResponseEntity.ok(newQuizDTO);
 
     }
 
     @GetMapping("/api/quizzes/{id}")
-    public ResponseEntity<Quiz> getQuizById(@PathVariable("id") int id){
+    public ResponseEntity<QuizReturnDTO> getQuizById(@PathVariable("id") int id){
+        QuizReturnDTO wantedQuiz;
         for(Quiz quiz: allQuizzes){
             if(quiz.getId() == id){
-                return ResponseEntity.ok(quiz);
+                wantedQuiz = new QuizReturnDTO(id, quiz.getTitle(), quiz.getText(), quiz.getOptions());
+                return ResponseEntity.ok(wantedQuiz);
             }
         }
         throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Quiz not found.");
     }
 
     @GetMapping("/api/quizzes")
-    public ResponseEntity<List<Quiz>> getQuizzes(){
-        return ResponseEntity.ok(allQuizzes);
+    public ResponseEntity<List<QuizReturnDTO>> getQuizzes(){
+        ArrayList<QuizReturnDTO> allQuizzesDTO = new ArrayList<>();
+        for(Quiz quiz: allQuizzes){
+            allQuizzesDTO.add(new QuizReturnDTO(quiz.getId(), quiz.getTitle(), quiz.getText(), quiz.getOptions()));
+        }
+
+        return ResponseEntity.ok(allQuizzesDTO);
     }
 
     @PostMapping("/api/quizzes/{id}/solve")
     public ResponseEntity<Map<String,Object>> solveQuiz(@PathVariable("id") int id, @RequestBody Map<String,List<Integer>> map){
-        List<Integer> answers = map.get("answer");
+        List<Integer> answers = (map.get("answer") == null) ? List.of() : map.get("answer");
         for(Quiz quiz: allQuizzes){
             if(quiz.getId() == id){
 
