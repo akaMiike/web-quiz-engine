@@ -3,22 +3,21 @@ package com.hyperskill.webquizengine.controller;
 import com.hyperskill.webquizengine.dto.QuizCreationDTO;
 import com.hyperskill.webquizengine.dto.QuizReturnDTO;
 import com.hyperskill.webquizengine.model.Quiz;
+import com.hyperskill.webquizengine.service.QuizService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.validation.Valid;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 public class QuizController {
 
-    private static List<Quiz> allQuizzes = new ArrayList<>();
-    private static int id = 0;
+    @Autowired
+    private QuizService quizService;
 
     @GetMapping("/api/quiz")
     public ResponseEntity<Quiz> getQuiz(){
@@ -41,7 +40,6 @@ public class QuizController {
             quizAnswer.put("success","false");
             quizAnswer.put("feedback","Not correct, try again!");
         }
-
         return ResponseEntity.ok(quizAnswer);
     }
 
@@ -53,29 +51,40 @@ public class QuizController {
             }
         }
 
-        Quiz newQuiz = new Quiz(++id, quiz.getTitle(), quiz.getText(), quiz.getOptions(), quiz.getAnswer());
-        allQuizzes.add(newQuiz);
+        Quiz newQuiz = new Quiz(0, quiz.getTitle(), quiz.getText(), quiz.getOptions(), quiz.getAnswer());
+        quizService.save(newQuiz);
 
-        QuizReturnDTO newQuizDTO = new QuizReturnDTO(newQuiz.getId(), newQuiz.getTitle(), newQuiz.getText(), newQuiz.getOptions());
-        return ResponseEntity.ok(newQuizDTO);
+        QuizReturnDTO newQuizResult = new QuizReturnDTO(newQuiz.getId(), newQuiz.getTitle(), newQuiz.getText(), newQuiz.getOptions());
+        return ResponseEntity.ok(newQuizResult);
 
     }
 
     @GetMapping("/api/quizzes/{id}")
-    public ResponseEntity<QuizReturnDTO> getQuizById(@PathVariable("id") int id){
-        QuizReturnDTO wantedQuiz;
-        for(Quiz quiz: allQuizzes){
-            if(quiz.getId() == id){
-                wantedQuiz = new QuizReturnDTO(id, quiz.getTitle(), quiz.getText(), quiz.getOptions());
-                return ResponseEntity.ok(wantedQuiz);
-            }
+    public ResponseEntity<QuizReturnDTO> getQuizById(@PathVariable("id") long id){
+        Optional<Quiz> quizQueryResult = quizService.findById(id);
+
+        if(quizQueryResult.isPresent()){
+            Quiz quiz = quizQueryResult.get();
+            QuizReturnDTO quizResult = new QuizReturnDTO(
+                    id,
+                    quiz.getTitle(),
+                    quiz.getText(),
+                    quiz.getOptions()
+            );
+
+            return ResponseEntity.ok(quizResult);
         }
-        throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Quiz not found.");
+
+        else{
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Quiz not found.");
+        }
     }
 
     @GetMapping("/api/quizzes")
     public ResponseEntity<List<QuizReturnDTO>> getQuizzes(){
         ArrayList<QuizReturnDTO> allQuizzesDTO = new ArrayList<>();
+        List<Quiz> allQuizzes = quizService.findAll();
+
         for(Quiz quiz: allQuizzes){
             allQuizzesDTO.add(new QuizReturnDTO(quiz.getId(), quiz.getTitle(), quiz.getText(), quiz.getOptions()));
         }
@@ -84,22 +93,27 @@ public class QuizController {
     }
 
     @PostMapping("/api/quizzes/{id}/solve")
-    public ResponseEntity<Map<String,Object>> solveQuiz(@PathVariable("id") int id, @RequestBody Map<String,List<Integer>> map){
+    public ResponseEntity<Map<String,Object>> solveQuiz(@PathVariable("id") long id, @RequestBody Map<String,List<Integer>> map){
         List<Integer> answers = (map.get("answer") == null) ? List.of() : map.get("answer");
-        for(Quiz quiz: allQuizzes){
-            if(quiz.getId() == id){
+        Optional<Quiz> quizQueryResult = quizService.findById(id);
 
-                if(quiz.getAnswer().equals(answers)){
-                    return ResponseEntity.ok(
-                            Map.of("success",true, "feedback","Congratulations, you're right!")
-                    );
-                }
+        if(quizQueryResult.isPresent()){
+            Quiz quiz = quizQueryResult.get();
 
-                else{
-                    return ResponseEntity.ok(
-                            Map.of("success",false, "feedback","Wrong answer! Please, try again.")
-                    );
-                }
+            if(quiz.getAnswer().containsAll(answers) && answers.containsAll(quiz.getAnswer())){
+                return ResponseEntity.ok(
+                        Map.of("success",true,
+                                "feedback","Congratulations, you're right!"
+                        )
+                );
+            }
+
+            else{
+                return ResponseEntity.ok(
+                        Map.of("success",false,
+                                "feedback","Wrong answer! Please, try again."
+                        )
+                );
             }
         }
 
