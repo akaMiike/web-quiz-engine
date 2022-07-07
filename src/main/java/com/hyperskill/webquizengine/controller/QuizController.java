@@ -2,11 +2,17 @@ package com.hyperskill.webquizengine.controller;
 
 import com.hyperskill.webquizengine.dto.QuizCreationDTO;
 import com.hyperskill.webquizengine.dto.QuizReturnDTO;
+import com.hyperskill.webquizengine.dto.UserCreationDTO;
 import com.hyperskill.webquizengine.model.Quiz;
+import com.hyperskill.webquizengine.model.User;
 import com.hyperskill.webquizengine.service.QuizService;
+import com.hyperskill.webquizengine.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -18,13 +24,20 @@ public class QuizController {
 
     @Autowired
     private QuizService quizService;
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
 
     @GetMapping("/api/quiz")
     public ResponseEntity<Quiz> getQuiz(){
         Quiz quiz = new Quiz(
                 "First Programmer",
                 "Who was the first programmer?",
-                List.of("Alan Turing", "Steve Jobs", "Ada Lovelace", "Linus Torvalds"));
+                List.of("Alan Turing", "Steve Jobs", "Ada Lovelace", "Linus Torvalds"),
+                null
+        );
 
         return ResponseEntity.ok(quiz);
     }
@@ -44,14 +57,17 @@ public class QuizController {
     }
 
     @PostMapping("/api/quizzes")
-    public ResponseEntity<QuizReturnDTO> createQuiz(@RequestBody @Valid QuizCreationDTO quiz){
+    public ResponseEntity<QuizReturnDTO> createQuiz(@RequestBody @Valid QuizCreationDTO quiz,
+                                                    @AuthenticationPrincipal UserDetails userDetails){
         for(Integer answer : quiz.getAnswer()){
             if(answer >= quiz.getOptions().size() || answer < 0){
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"index of answer is not in the options.");
             }
         }
 
-        Quiz newQuiz = new Quiz(0, quiz.getTitle(), quiz.getText(), quiz.getOptions(), quiz.getAnswer());
+        User loggedInUser = userService.findByEmail(userDetails.getUsername()).get();
+
+        Quiz newQuiz = new Quiz(0, quiz.getTitle(), quiz.getText(), quiz.getOptions(), quiz.getAnswer(), loggedInUser);
         quizService.save(newQuiz);
 
         QuizReturnDTO newQuizResult = new QuizReturnDTO(newQuiz.getId(), newQuiz.getTitle(), newQuiz.getText(), newQuiz.getOptions());
@@ -120,5 +136,35 @@ public class QuizController {
         throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Quiz not found.");
     }
 
+    @PostMapping("/api/register")
+    public void register(@RequestBody @Valid UserCreationDTO user){
+        Optional<User> existingUser = userService.findByEmail(user.getEmail());
 
+        if(existingUser.isPresent()){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Email is already taken.");
+        }
+
+        User newUser = new User(user.getEmail(), passwordEncoder.encode(user.getPassword()));
+        userService.save(newUser);
+    }
+
+    @DeleteMapping("/api/quizzes/{id}")
+    public void deleteQuiz(@PathVariable("id") long id, @AuthenticationPrincipal UserDetails userDetails){
+        Optional<Quiz> quizToBeDeleted = quizService.findById(id);
+        System.out.println("entrou1");
+        if(quizToBeDeleted.isEmpty()){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found");
+        }
+        System.out.println("entrou2");
+
+        User quizAuthor = quizToBeDeleted.get().getUser();
+        System.out.println(quizAuthor);
+        String loggedInUserEmail = userDetails.getUsername();
+        System.out.println(loggedInUserEmail);
+        if(!quizAuthor.getEmail().equals(loggedInUserEmail)){
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can't delete this quiz because you're not the author.");
+        }
+
+        quizService.delete(quizToBeDeleted.get());
+    }
 }
