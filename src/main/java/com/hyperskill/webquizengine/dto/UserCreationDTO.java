@@ -3,10 +3,12 @@ package com.hyperskill.webquizengine.dto;
 import org.hibernate.validator.constraints.Length;
 
 import javax.validation.constraints.Email;
+import javax.validation.constraints.NotNull;
 
 public class UserCreationDTO {
 
-    @Email
+    @Email(regexp = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$")
+    @NotNull
     private String email;
 
     @Length(min = 5)

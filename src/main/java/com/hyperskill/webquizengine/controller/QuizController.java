@@ -1,6 +1,7 @@
 package com.hyperskill.webquizengine.controller;
 
 import com.hyperskill.webquizengine.dto.QuizCreationDTO;
+import com.hyperskill.webquizengine.dto.QuizFeedbackDTO;
 import com.hyperskill.webquizengine.dto.QuizReturnDTO;
 import com.hyperskill.webquizengine.dto.UserCreationDTO;
 import com.hyperskill.webquizengine.model.Quiz;
@@ -76,11 +77,18 @@ public class QuizController {
     }
 
     @GetMapping("/api/quizzes/{id}")
-    public ResponseEntity<QuizReturnDTO> getQuizById(@PathVariable("id") long id){
+    public ResponseEntity<QuizReturnDTO> getQuizById(@PathVariable("id") long id,
+                                                     @AuthenticationPrincipal UserDetails userDetails){
         Optional<Quiz> quizQueryResult = quizService.findById(id);
 
         if(quizQueryResult.isPresent()){
             Quiz quiz = quizQueryResult.get();
+            String loggedInUser = userDetails.getUsername();
+
+            if(!quiz.getUser().getEmail().equals(loggedInUser)){
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This quiz belongs to another user.");
+            }
+
             QuizReturnDTO quizResult = new QuizReturnDTO(
                     id,
                     quiz.getTitle(),
@@ -109,26 +117,29 @@ public class QuizController {
     }
 
     @PostMapping("/api/quizzes/{id}/solve")
-    public ResponseEntity<Map<String,Object>> solveQuiz(@PathVariable("id") long id, @RequestBody Map<String,List<Integer>> map){
+    public ResponseEntity<QuizFeedbackDTO> solveQuiz(@PathVariable("id") long id,
+                                                        @RequestBody Map<String,List<Integer>> map,
+                                                        @AuthenticationPrincipal UserDetails userDetails){
         List<Integer> answers = (map.get("answer") == null) ? List.of() : map.get("answer");
         Optional<Quiz> quizQueryResult = quizService.findById(id);
 
         if(quizQueryResult.isPresent()){
             Quiz quiz = quizQueryResult.get();
+            String loggedInUser = userDetails.getUsername();
+
+            if(!quiz.getUser().getEmail().equals(loggedInUser)){
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This quiz belongs to another user.");
+            }
 
             if(quiz.getAnswer().containsAll(answers) && answers.containsAll(quiz.getAnswer())){
                 return ResponseEntity.ok(
-                        Map.of("success",true,
-                                "feedback","Congratulations, you're right!"
-                        )
+                        new QuizFeedbackDTO(true, "Congratulations, you're right!")
                 );
             }
 
             else{
                 return ResponseEntity.ok(
-                        Map.of("success",false,
-                                "feedback","Wrong answer! Please, try again."
-                        )
+                        new QuizFeedbackDTO(false, "Wrong answer! Please, try again.")
                 );
             }
         }
