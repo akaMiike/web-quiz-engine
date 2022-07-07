@@ -137,7 +137,7 @@ public class QuizController {
     }
 
     @PostMapping("/api/register")
-    public void register(@RequestBody @Valid UserCreationDTO user){
+    public ResponseEntity<Void> register(@RequestBody @Valid UserCreationDTO user){
         Optional<User> existingUser = userService.findByEmail(user.getEmail());
 
         if(existingUser.isPresent()){
@@ -146,25 +146,26 @@ public class QuizController {
 
         User newUser = new User(user.getEmail(), passwordEncoder.encode(user.getPassword()));
         userService.save(newUser);
+
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/api/quizzes/{id}")
-    public void deleteQuiz(@PathVariable("id") long id, @AuthenticationPrincipal UserDetails userDetails){
+    public ResponseEntity<Void> deleteQuiz(@PathVariable("id") long id, @AuthenticationPrincipal UserDetails userDetails){
         Optional<Quiz> quizToBeDeleted = quizService.findById(id);
-        System.out.println("entrou1");
+
         if(quizToBeDeleted.isEmpty()){
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found");
         }
-        System.out.println("entrou2");
 
         User quizAuthor = quizToBeDeleted.get().getUser();
-        System.out.println(quizAuthor);
         String loggedInUserEmail = userDetails.getUsername();
-        System.out.println(loggedInUserEmail);
+
         if(!quizAuthor.getEmail().equals(loggedInUserEmail)){
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can't delete this quiz because you're not the author.");
         }
 
         quizService.delete(quizToBeDeleted.get());
+        return ResponseEntity.noContent().build();
     }
 }
