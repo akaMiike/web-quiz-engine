@@ -3,16 +3,16 @@ package com.hyperskill.webquizengine.dto;
 
 import java.util.List;
 
-public class QuizReturnDTO {
+public class QuizInfoDTO {
     private long id;
     private String title;
     private String text;
     private List<String> options;
 
-    public QuizReturnDTO() {
+    public QuizInfoDTO() {
     }
 
-    public QuizReturnDTO(long id, String title, String text, List<String> options) {
+    public QuizInfoDTO(long id, String title, String text, List<String> options) {
         this.id = id;
         this.title = title;
         this.text = text;

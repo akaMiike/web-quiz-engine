@@ -1,14 +1,16 @@
 package com.hyperskill.webquizengine.controller;
 
-import com.hyperskill.webquizengine.dto.QuizCreationDTO;
-import com.hyperskill.webquizengine.dto.QuizFeedbackDTO;
-import com.hyperskill.webquizengine.dto.QuizReturnDTO;
-import com.hyperskill.webquizengine.dto.UserCreationDTO;
+import com.hyperskill.webquizengine.dto.*;
 import com.hyperskill.webquizengine.model.Quiz;
+import com.hyperskill.webquizengine.model.QuizCompletionInfo;
 import com.hyperskill.webquizengine.model.User;
+import com.hyperskill.webquizengine.service.QuizCompletionInfoService;
 import com.hyperskill.webquizengine.service.QuizService;
 import com.hyperskill.webquizengine.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,7 +20,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.validation.Valid;
+import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 public class QuizController {
@@ -27,6 +31,8 @@ public class QuizController {
     private QuizService quizService;
     @Autowired
     private UserService userService;
+    @Autowired
+    private QuizCompletionInfoService quizCompletionInfoService;
     @Autowired
     private PasswordEncoder passwordEncoder;
 
@@ -58,8 +64,8 @@ public class QuizController {
     }
 
     @PostMapping("/api/quizzes")
-    public ResponseEntity<QuizReturnDTO> createQuiz(@RequestBody @Valid QuizCreationDTO quiz,
-                                                    @AuthenticationPrincipal UserDetails userDetails){
+    public ResponseEntity<QuizInfoDTO> createQuiz(@RequestBody @Valid QuizCreationDTO quiz,
+                                                  @AuthenticationPrincipal UserDetails userDetails){
         for(Integer answer : quiz.getAnswer()){
             if(answer >= quiz.getOptions().size() || answer < 0){
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"index of answer is not in the options.");
@@ -71,14 +77,14 @@ public class QuizController {
         Quiz newQuiz = new Quiz(0, quiz.getTitle(), quiz.getText(), quiz.getOptions(), quiz.getAnswer(), loggedInUser);
         quizService.save(newQuiz);
 
-        QuizReturnDTO newQuizResult = new QuizReturnDTO(newQuiz.getId(), newQuiz.getTitle(), newQuiz.getText(), newQuiz.getOptions());
+        QuizInfoDTO newQuizResult = new QuizInfoDTO(newQuiz.getId(), newQuiz.getTitle(), newQuiz.getText(), newQuiz.getOptions());
         return ResponseEntity.ok(newQuizResult);
 
     }
 
     @GetMapping("/api/quizzes/{id}")
-    public ResponseEntity<QuizReturnDTO> getQuizById(@PathVariable("id") long id,
-                                                     @AuthenticationPrincipal UserDetails userDetails){
+    public ResponseEntity<QuizInfoDTO> getQuizById(@PathVariable("id") long id,
+                                                   @AuthenticationPrincipal UserDetails userDetails){
         Optional<Quiz> quizQueryResult = quizService.findById(id);
 
         if(quizQueryResult.isPresent()){
@@ -89,7 +95,7 @@ public class QuizController {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This quiz belongs to another user.");
             }
 
-            QuizReturnDTO quizResult = new QuizReturnDTO(
+            QuizInfoDTO quizResult = new QuizInfoDTO(
                     id,
                     quiz.getTitle(),
                     quiz.getText(),
@@ -105,13 +111,12 @@ public class QuizController {
     }
 
     @GetMapping("/api/quizzes")
-    public ResponseEntity<List<QuizReturnDTO>> getQuizzes(){
-        ArrayList<QuizReturnDTO> allQuizzesDTO = new ArrayList<>();
-        List<Quiz> allQuizzes = quizService.findAll();
+    public ResponseEntity<Page<QuizInfoDTO>> getQuizzes(@RequestParam("page") int page){
+        Page<Quiz> allQuizzes = quizService.findAll(page, 10);
 
-        for(Quiz quiz: allQuizzes){
-            allQuizzesDTO.add(new QuizReturnDTO(quiz.getId(), quiz.getTitle(), quiz.getText(), quiz.getOptions()));
-        }
+        Page<QuizInfoDTO> allQuizzesDTO = new PageImpl<>(allQuizzes.getContent().stream()
+                .map(quiz -> new QuizInfoDTO(quiz.getId(), quiz.getTitle(), quiz.getText(), quiz.getOptions())).collect(Collectors.toList()),
+                PageRequest.of(page, 10), allQuizzes.getTotalElements());
 
         return ResponseEntity.ok(allQuizzesDTO);
     }
@@ -132,6 +137,9 @@ public class QuizController {
             }
 
             if(quiz.getAnswer().containsAll(answers) && answers.containsAll(quiz.getAnswer())){
+                QuizCompletionInfo newCompletion = new QuizCompletionInfo(ZonedDateTime.now(), quiz);
+                quizCompletionInfoService.save(newCompletion);
+
                 return ResponseEntity.ok(
                         new QuizFeedbackDTO(true, "Congratulations, you're right!")
                 );
@@ -178,5 +186,20 @@ public class QuizController {
 
         quizService.delete(quizToBeDeleted.get());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/api/quizzes/completed")
+    public ResponseEntity<Page<QuizCompletionInfoDTO>> getQuizCompletionInfo(@RequestParam("page") int page,
+            @AuthenticationPrincipal UserDetails userDetails){
+        String loggedInUserEmail = userDetails.getUsername();
+
+        Page<QuizCompletionInfo> allCompletions = quizCompletionInfoService.findAllCompletionsByUserEmailPaged(
+                loggedInUserEmail, page, 10, "completedAt", "ASC");
+
+        Page<QuizCompletionInfoDTO> allCompletionsDTO = new PageImpl<>(allCompletions.getContent().stream()
+                .map(completion -> new QuizCompletionInfoDTO(completion.getId(), completion.getCompletedAt()))
+                .collect(Collectors.toList()));
+
+        return ResponseEntity.ok(allCompletionsDTO);
     }
 }

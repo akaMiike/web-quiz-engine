@@ -4,6 +4,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 import javax.persistence.*;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -33,6 +35,11 @@ public class Quiz {
     @Column(name="answer")
     private List<Integer> answer;
 
+    @ElementCollection
+    @CollectionTable(name="completedAt", joinColumns = @JoinColumn(name="id"))
+    @Column(name = "completedAt")
+    private List<ZonedDateTime> completedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_user")
     private User user;
@@ -46,6 +53,7 @@ public class Quiz {
         this.options = options;
         this.answer = answer;
         this.user = user;
+        this.completedAt = new ArrayList<>();
     }
 
     public Quiz(String title, String text, List<String> options, User user){
