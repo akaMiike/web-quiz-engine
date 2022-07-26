@@ -25,6 +25,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
+@RequestMapping("/api")
 public class QuizController {
 
     @Autowired
@@ -36,8 +37,8 @@ public class QuizController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-
-    @GetMapping("/api/quiz")
+    //Endpoint just for testing in the first stages
+    @GetMapping("/quiz")
     public ResponseEntity<Quiz> getQuiz(){
         Quiz quiz = new Quiz(
                 "First Programmer",
@@ -48,8 +49,8 @@ public class QuizController {
 
         return ResponseEntity.ok(quiz);
     }
-
-    @PostMapping("/api/quiz")
+    //Endpoint just for testing in the first stages
+    @PostMapping("/quiz")
     public ResponseEntity<Map<String,String>> getAnswer(@RequestParam int answer){
         HashMap<String,String> quizAnswer = new HashMap<>();
         if(answer == 2){
@@ -63,7 +64,7 @@ public class QuizController {
         return ResponseEntity.ok(quizAnswer);
     }
 
-    @PostMapping("/api/quizzes")
+    @PostMapping("/quizzes")
     public ResponseEntity<QuizInfoDTO> createQuiz(@RequestBody @Valid QuizCreationDTO quiz,
                                                   @AuthenticationPrincipal UserDetails userDetails){
         for(Integer answer : quiz.getAnswer()){
@@ -74,6 +75,7 @@ public class QuizController {
 
         User loggedInUser = userService.findByEmail(userDetails.getUsername()).get();
 
+        
         Quiz newQuiz = new Quiz(0, quiz.getTitle(), quiz.getText(), quiz.getOptions(), quiz.getAnswer(), loggedInUser);
         quizService.save(newQuiz);
 
@@ -82,7 +84,7 @@ public class QuizController {
 
     }
 
-    @GetMapping("/api/quizzes/{id}")
+    @GetMapping("/quizzes/{id}")
     public ResponseEntity<QuizInfoDTO> getQuizById(@PathVariable("id") long id,
                                                    @AuthenticationPrincipal UserDetails userDetails){
         Optional<Quiz> quizQueryResult = quizService.findById(id);
@@ -110,7 +112,7 @@ public class QuizController {
         }
     }
 
-    @GetMapping("/api/quizzes")
+    @GetMapping("/quizzes")
     public ResponseEntity<Page<QuizInfoDTO>> getQuizzes(@RequestParam("page") int page){
         Page<Quiz> allQuizzes = quizService.findAll(page, 10);
 
@@ -121,7 +123,7 @@ public class QuizController {
         return ResponseEntity.ok(allQuizzesDTO);
     }
 
-    @PostMapping("/api/quizzes/{id}/solve")
+    @PostMapping("/quizzes/{id}/solve")
     public ResponseEntity<QuizFeedbackDTO> solveQuiz(@PathVariable("id") long id,
                                                         @RequestBody Map<String,List<Integer>> map,
                                                         @AuthenticationPrincipal UserDetails userDetails){
@@ -130,14 +132,11 @@ public class QuizController {
 
         if(quizQueryResult.isPresent()){
             Quiz quiz = quizQueryResult.get();
-            String loggedInUser = userDetails.getUsername();
-
-            if(!quiz.getUser().getEmail().equals(loggedInUser)){
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This quiz belongs to another user.");
-            }
+            String loggedInUserEmail = userDetails.getUsername();
+            User loggedInUser = userService.findByEmail(loggedInUserEmail).get();
 
             if(quiz.getAnswer().containsAll(answers) && answers.containsAll(quiz.getAnswer())){
-                QuizCompletionInfo newCompletion = new QuizCompletionInfo(ZonedDateTime.now(), quiz);
+                QuizCompletionInfo newCompletion = new QuizCompletionInfo(ZonedDateTime.now(), quiz, loggedInUser);
                 quizCompletionInfoService.save(newCompletion);
 
                 return ResponseEntity.ok(
@@ -155,7 +154,7 @@ public class QuizController {
         throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Quiz not found.");
     }
 
-    @PostMapping("/api/register")
+    @PostMapping("/register")
     public ResponseEntity<Void> register(@RequestBody @Valid UserCreationDTO user){
         Optional<User> existingUser = userService.findByEmail(user.getEmail());
 
@@ -169,7 +168,7 @@ public class QuizController {
         return ResponseEntity.ok().build();
     }
 
-    @DeleteMapping("/api/quizzes/{id}")
+    @DeleteMapping("/quizzes/{id}")
     public ResponseEntity<Void> deleteQuiz(@PathVariable("id") long id, @AuthenticationPrincipal UserDetails userDetails){
         Optional<Quiz> quizToBeDeleted = quizService.findById(id);
 
@@ -188,13 +187,14 @@ public class QuizController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/api/quizzes/completed")
+    @GetMapping("/quizzes/completed")
     public ResponseEntity<Page<QuizCompletionInfoDTO>> getQuizCompletionInfo(@RequestParam("page") int page,
             @AuthenticationPrincipal UserDetails userDetails){
+
         String loggedInUserEmail = userDetails.getUsername();
 
         Page<QuizCompletionInfo> allCompletions = quizCompletionInfoService.findAllCompletionsByUserEmailPaged(
-                loggedInUserEmail, page, 10, "completedAt", "ASC");
+                loggedInUserEmail, page, 10, "completedAt", "DESC");
 
         Page<QuizCompletionInfoDTO> allCompletionsDTO = new PageImpl<>(allCompletions.getContent().stream()
                 .map(completion -> new QuizCompletionInfoDTO(completion.getId(), completion.getCompletedAt()))

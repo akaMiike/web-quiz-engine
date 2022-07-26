@@ -13,21 +13,26 @@ import java.time.ZonedDateTime;
 public class QuizCompletionInfo {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private long id;
 
     @Column(name = "completedAt")
     private ZonedDateTime completedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "quiz_id")
     private Quiz quiz;
 
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
+
     public QuizCompletionInfo(){}
 
-    public QuizCompletionInfo(ZonedDateTime completedAt, Quiz quiz) {
+    public QuizCompletionInfo(ZonedDateTime completedAt, Quiz quiz, User user) {
         this.completedAt = completedAt;
         this.quiz = quiz;
+        this.user = user;
     }
 }

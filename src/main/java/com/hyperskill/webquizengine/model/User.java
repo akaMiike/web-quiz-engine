@@ -14,7 +14,7 @@ import java.util.List;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private long id;
 
@@ -26,6 +26,9 @@ public class User {
 
     @OneToMany(mappedBy = "user")
     private List<Quiz> quizzes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user")
+    private List<QuizCompletionInfo> completions = new ArrayList<>();
 
     public User(String email, String password) {
         this.email = email;
